@@ -436,7 +436,7 @@
   <!-- === Live Search === -->
   <div class="search-card">
     <div class="settings-toggle">
-      <button onclick="toggleSettings()">⚙️ API 設定（選填——用於 AI 中文摘要）</button>
+      <button onclick="toggleSettings()">⚙️ API 設定（選填——用於 AI 中文摘要和更精確結果）</button>
     </div>
 
     <div class="settings-panel" id="settingsPanel">
@@ -455,10 +455,10 @@
     <p class="input-hint" style="margin-bottom:12px;">
       🆓 <strong>不需 API key 即可搜尋</strong>——使用 OpenAlex（2.5 億篇）+ Semantic Scholar（2 億篇）+ CrossRef 三大免費學術資料庫。
       設定 API key 可獲得更精確的搜尋結果和 AI 中文摘要。AI 在背景執行，不影響搜尋速度。<br>
-      <span style="display:inline-block;margin-top:8px;">
+      <span style="display:inline-block;margin-top:8px;white-space:nowrap;">
         <strong>搜尋模式：</strong>
         <button id="modeShowcase" onclick="setSearchMode('showcase')" style="padding:4px 12px;background:var(--accent);color:#fff;border:none;border-radius:14px;cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600;">📋 展示（5+5）</button>
-        <button id="modeDeep" onclick="setSearchMode('deep')" style="padding:4px 12px;background:#e8e0d4;color:var(--text);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-left:4px;">🔬 深度（完整搜尋）</button>
+        <button id="modeDeep" onclick="setSearchMode('deep')" style="padding:4px 12px;background:#e8e0d4;color:var(--text);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-left:4px;">🔬 深度（10+10）</button>
       </span>
     </p>
     <p class="input-hint">💡 中英文皆可。英文關鍵字效果最佳（學術文獻以英文為主）。</p>
