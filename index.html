@@ -377,9 +377,48 @@
   .footer { text-align: center; padding: 32px; color: var(--muted); font-size: 0.85rem; }
 
   @media (max-width: 600px) {
-    .container { padding: 16px; }
-    .search-bar { flex-direction: column; }
-    .search-card, .paper-card, .conclusion-box { padding: 16px; }
+    .container { padding: 12px; }
+    .header { padding: 24px 0 16px; }
+    .header h1 { font-size: 1.3rem; }
+    .header .subtitle { font-size: 0.85rem; padding: 0 8px; }
+    .search-card { padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+    .search-bar { flex-direction: column; gap: 8px; }
+    .search-bar input { padding: 12px 14px; font-size: 0.95rem; }
+    .search-bar button { padding: 12px 20px; font-size: 0.95rem; }
+    .input-hint { font-size: 0.78rem; }
+    .demo-queries { gap: 6px; }
+    .demo-chip { padding: 6px 12px; font-size: 0.8rem; }
+
+    /* Journal section */
+    .journal-section { border-radius: 8px; margin-bottom: 16px; }
+    .journal-toggle { padding: 14px 16px; font-size: 0.9rem; }
+    .journal-body { padding: 0 14px 16px; }
+    .journal-body.open { padding: 0 14px 16px; }
+    .journal-intro { font-size: 0.8rem; }
+    .journal-item { padding: 12px 0; }
+    .journal-item .journal-name { font-size: 0.88rem; line-height: 1.6; }
+    .journal-item .journal-desc { font-size: 0.8rem; }
+    .journal-if, .journal-tag { font-size: 0.7rem; padding: 1px 6px; }
+    .journal-rr-note { padding: 12px 14px; font-size: 0.82rem; }
+
+    /* Report */
+    .paper-card, .conclusion-box { padding: 14px; border-radius: 8px; }
+    .report .section-title { font-size: 1.1rem; }
+    .paper-card .paper-title { font-size: 0.95rem; }
+    .paper-card .paper-meta { font-size: 0.8rem; }
+    .paper-card .paper-body { font-size: 0.88rem; }
+    .insight-box { padding: 12px 14px; }
+
+    /* Settings */
+    .settings-panel { padding: 14px; }
+    .settings-panel input { font-size: 0.9rem; padding: 8px 10px; }
+    .settings-toggle button { font-size: 0.78rem; }
+
+    /* Progress */
+    .progress-stages { font-size: 0.7rem; }
+
+    /* Footer */
+    .footer { padding: 20px 12px; font-size: 0.75rem; }
   }
 </style>
 </head>
