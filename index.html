@@ -208,6 +208,28 @@
   .journal-if.if-low  { background: #e8e0d4; color: #6b5e4f; }      /* IF < 2 */
   .journal-if.if-na   { background: #f0ebe0; color: #999; font-weight: 400; }  /* 無 IF */
   .journal-if.if-gone { background: #fde0dc; color: var(--danger); } /* 已除名 */
+  .journal-intro-card {
+    background: #faf8f3;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .journal-intro-card p { margin-bottom: 10px; }
+  .journal-no-if-note {
+    background: #fefbf4;
+    border: 1px solid var(--accent-warm);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--text);
+  }
   .journal-rr-note {
     background: #f0f7e8;
     border: 1px solid var(--accent);
@@ -400,6 +422,8 @@
     .journal-item .journal-name { font-size: 0.88rem; line-height: 1.6; }
     .journal-item .journal-desc { font-size: 0.8rem; }
     .journal-if, .journal-tag { font-size: 0.7rem; padding: 1px 6px; }
+    .journal-intro-card { padding: 12px 14px; font-size: 0.82rem; }
+    .journal-no-if-note { padding: 12px 14px; font-size: 0.8rem; }
     .journal-rr-note { padding: 12px 14px; font-size: 0.82rem; }
 
     /* Report */
@@ -443,7 +467,7 @@
       <label>AI API Key（選填。支援 OpenAI / DeepSeek / OpenRouter / Groq 等相容 API）</label>
       <input type="password" id="apiKeyInput" placeholder="sk-...（選填，自動偵測 provider）">
       <p class="help-text">
-        🔗 <a href="https://openrouter.ai/settings/keys" target="_blank">OpenRouter</a>（50次/天免費）· <a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek</a>（免費）· <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a>或其他付費API<br>
+        🔗 <a href="https://openrouter.ai/settings/keys" target="_blank">OpenRouter</a>（50次/天免費）· <a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek</a>· <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a>或其他付費API<br>
         自動依 key 格式偵測 provider。Key 只在瀏覽器，不上傳伺服器。
       </p>
     </div>
@@ -474,17 +498,13 @@
       <span class="arrow" id="journalArrow">▶</span>
     </button>
     <div class="journal-body" id="journalBody">
-      <p class="journal-intro">
-    以下期刊已建立正式的不顯著／無效結果投稿政策。每本期刊的接受標準與審查制度不同，詳列如下。
-    點擊期刊名稱可直接前往投稿頁面。IF 資料來源：2025 JCR（Clarivate）。
-    <span style="display:inline-block;margin-left:8px;">
-      <span class="journal-if if-high">IF ≥ 4</span>
-      <span class="journal-if if-mid">IF 2–3.9</span>
-      <span class="journal-if if-low">IF &lt; 2</span>
-      <span class="journal-if if-na">無 JCR IF</span>
-    </span>
-    <br><span style="font-size:0.82rem;color:var(--muted);">⚠️ 無 IF 不代表期刊不好——常見原因：① 太新（創刊未滿 3 年，尚無足夠引用數據）② 收錄於 ESCI 但尚未升上 SCIE（ESCI 期刊不發 JCR IF）③ 未申請或未被 Web of Science 收錄（僅在 Scopus 等其他資料庫）。這些期刊仍經過同儕審查，對不顯著結果的接受度通常比高 IF 期刊更友善。</span>
-  </p>
+      <div class="journal-intro-card">
+    <p>以下期刊已建立正式的不顯著／無效結果投稿政策。每本期刊的接受標準與審查制度不同，詳列如下。點擊期刊名稱可直接前往投稿頁面。IF 資料來源：2025 JCR（Clarivate）。</p>
+    <span class="journal-if if-high">IF ≥ 4</span>
+    <span class="journal-if if-mid">IF 2–3.9</span>
+    <span class="journal-if if-low">IF &lt; 2</span>
+    <span class="journal-if if-na">無 JCR IF</span>
+  </div>
 
       <div class="journal-item">
         <div class="journal-name"><a href="https://www.nature.com/srep/" target="_blank">Scientific Reports</a><span class="journal-if if-high">IF 4.9</span><span class="journal-tag">Springer Nature</span></div>
@@ -544,6 +564,11 @@
       <div class="journal-item">
         <div class="journal-name"><a href="http://www.arjournals.com/ojs/" target="_blank">All Results Journals</a><span class="journal-if if-na">無 IF</span><span class="journal-tag">多領域</span></div>
         <div class="journal-desc">涵蓋生物學（All Results Journals: Biol）、化學（Chem）、物理（Phys）等多領域的不顯著結果專門期刊。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：獨立小眾出版，未收錄於 Web of Science。<br>📌 獨立出版商，專門刊登不顯著／無效結果。非掠奪性，但規模極小、更新頻率低。投稿前建議確認目前是否仍活躍出刊。</span></div>
+      </div>
+
+      <div class="journal-no-if-note">
+        <strong>⚠️ 無 IF 不代表期刊不好</strong><br>
+        常見原因：① 太新（創刊未滿 3 年，尚無足夠引用數據）② 收錄於 ESCI 但尚未升上 SCIE（ESCI 期刊不發 JCR IF）③ 未申請或未被 Web of Science 收錄（僅在 Scopus 等其他資料庫）。這些期刊仍經過同儕審查，對不顯著結果的接受度通常比高 IF 期刊更友善。
       </div>
 
       <div class="journal-rr-note">
