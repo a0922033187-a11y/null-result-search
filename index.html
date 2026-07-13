@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📚 不顯著結果文獻搜尋工具 — Null Result Search Tool</title>
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --card: #fffef9;
+    --text: #3d3226;
+    --muted: #6b5e4f;
+    --accent: #6b8e4e;
+    --accent-warm: #c4943a;
+    --danger: #c0392b;
+    --danger-bg: #fdf0ed;
+    --border: #d4c8b4;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    min-height: 100vh;
+  }
+  .container { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ── Header ── */
+  .header { text-align: center; padding: 48px 0 32px; }
+  .header h1 { font-size: 1.8rem; color: var(--text); margin-bottom: 8px; }
+  .header .subtitle { font-size: 1rem; color: var(--muted); }
+
+  /* ── Search Section ── */
+  .search-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+  }
+  .search-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .search-bar input {
+    flex: 1;
+    padding: 14px 20px;
+    font-size: 1.05rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  .search-bar input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .search-bar button {
+    padding: 14px 28px;
+    font-size: 1.05rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .search-bar button:hover { background: #5a7a3e; }
+  .search-bar button:disabled { background: #999; cursor: not-allowed; }
+  .input-hint {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  /* ── Demo Queries ── */
+  .demo-queries { display: flex; flex-wrap: wrap; gap: 8px; }
+  .demo-chip {
+    padding: 8px 16px;
+    background: #f0ebe0;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .demo-chip:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ── Settings ── */
+  .settings-toggle { text-align: right; margin-bottom: 8px; }
+  .settings-toggle button {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.85rem; font-family: inherit; text-decoration: underline;
+  }
+  .settings-panel {
+    background: #faf8f3; border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px; margin-bottom: 24px; display: none;
+  }
+  .settings-panel.open { display: block; }
+  .settings-panel label { display: block; font-size: 0.9rem; margin-bottom: 4px; color: var(--muted); }
+  .settings-panel input {
+    width: 100%; padding: 10px 14px; font-size: 0.95rem;
+    border: 1px solid var(--border); border-radius: 6px; font-family: monospace; margin-bottom: 12px;
+  }
+  .settings-panel .help-text { font-size: 0.8rem; color: var(--muted); }
+  .settings-panel .help-text a { color: var(--accent); }
+
+  /* ── Journal List (collapsible) ── */
+  .journal-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .journal-toggle {
+    width: 100%;
+    padding: 18px 28px;
+    background: #faf8f3;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+  }
+  .journal-toggle:hover { background: #f0ebe0; }
+  .journal-toggle .arrow {
+    font-size: 0.8rem;
+    color: var(--muted);
+    display: inline-block;
+    transition: transform 0.3s;
+  }
+  .journal-toggle.open .arrow { transform: rotate(90deg); }
+  .journal-body {
+    display: none;
+    padding: 0 28px 24px;
+    border-top: 1px solid var(--border);
+  }
+  .journal-body.open { display: block; }
+  .journal-body .journal-intro {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin: 16px 0 12px;
+    line-height: 1.7;
+  }
+  .journal-item {
+    padding: 14px 0;
+    border-bottom: 1px solid #eee8d8;
+  }
+  .journal-item:last-child { border-bottom: none; }
+  .journal-item .journal-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text);
+  }
+  .journal-item .journal-name a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .journal-item .journal-name a:hover { text-decoration: underline; }
+  .journal-item .journal-desc {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.6;
+  }
+  .journal-item .journal-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #e0ecf5;
+    color: #2c5f8a;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .journal-item .journal-tag.doi {
+    background: #f0ebe0;
+    color: #6b5e4f;
+  }
+  .journal-if {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.73rem;
+    font-weight: 600;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .journal-if.if-high { background: #d4edda; color: #155724; }      /* IF ≥ 4 */
+  .journal-if.if-mid  { background: #fff3cd; color: #856404; }      /* IF 2–3.9 */
+  .journal-if.if-low  { background: #e8e0d4; color: #6b5e4f; }      /* IF < 2 */
+  .journal-if.if-na   { background: #f0ebe0; color: #999; font-weight: 400; }  /* 無 IF */
+  .journal-if.if-gone { background: #fde0dc; color: var(--danger); } /* 已除名 */
+  .journal-rr-note {
+    background: #f0f7e8;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 16px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .journal-rr-note strong { color: var(--accent); }
+
+  /* ── Progress bar ── */
+  .progress-wrap { margin: 0 0 16px; display: none; }
+  .progress-wrap.active { display: block; }
+  .progress-stages { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.78rem; color: var(--muted); }
+  .progress-stages span { flex: 1; text-align: center; }
+  .progress-stages span.done { color: var(--accent); font-weight: 600; }
+  .progress-stages span.current { color: var(--accent-warm); font-weight: 700; }
+  .progress-bar { height: 6px; background: #e8e0d4; border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; width: 0%; }
+
+  /* ── Status ── */
+  .status { text-align: center; padding: 16px; font-size: 0.9rem; color: var(--muted); }
+  .status.error { color: var(--danger); }
+  .status.loading { color: var(--accent-warm); }
+
+  /* ── Report Styling ── */
+  .report { display: none; }
+  .report.visible { display: block; }
+
+  /* Section header */
+  .report .section-title {
+    font-size: 1.3rem;
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 8px;
+    margin: 36px 0 16px;
+    font-weight: 700;
+  }
+  .report .section-title:first-child { margin-top: 0; }
+
+  /* Paper card */
+  .paper-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 14px 0;
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s;
+  }
+  .paper-card.negative { border-left: 4px solid var(--danger); background: #fefaf9; }
+  .paper-card .card-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .card-badge.neg { background: #fde0dc; color: var(--danger); }
+  .card-badge.pos { background: #e0ecf5; color: #2c5f8a; }
+  .card-badge.sug { background: #f0ebe0; color: #6b5e4f; }
+
+  /* Suggested paper card */
+  .paper-card.suggested { opacity: 0.85; border-left: 3px solid #c4b89a; background: #faf8f3; }
+
+  .paper-card .paper-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text);
+    margin-bottom: 6px;
+    line-height: 1.5;
+  }
+  .paper-card .paper-meta {
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  .paper-card .paper-doi {
+    font-size: 0.82rem;
+    margin-bottom: 10px;
+  }
+  .paper-card .paper-doi a { color: var(--accent); word-break: break-all; }
+  .paper-card .paper-doi .unverified {
+    color: var(--accent-warm);
+    font-size: 0.78rem;
+    font-style: italic;
+  }
+
+  .paper-card .paper-body {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: var(--text);
+  }
+
+  /* Insight box */
+  .insight-box {
+    background: #faf7f2;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 14px;
+  }
+  .insight-box .insight-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--danger);
+    margin-bottom: 4px;
+  }
+  .insight-box .insight-text {
+    font-size: 0.92rem;
+    line-height: 1.7;
+  }
+
+  /* Conclusion box */
+  .conclusion-box {
+    background: linear-gradient(135deg, #f0f7e8, #faf8f3);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    padding: 28px 32px;
+    margin-top: 36px;
+  }
+  .conclusion-box .section-title { margin-top: 0; border-bottom: none; }
+
+  /* News card */
+  .news-card {
+    background: #fefbf4;
+    border: 1px solid var(--accent-warm);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 12px 0;
+  }
+  .news-card .news-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent-warm);
+    margin-bottom: 4px;
+  }
+
+  /* Disclaimer */
+  .disclaimer {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding: 16px;
+    margin-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 20px; height: 20px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Footer ── */
+  .footer { text-align: center; padding: 32px; color: var(--muted); font-size: 0.85rem; }
+
+  @media (max-width: 600px) {
+    .container { padding: 16px; }
+    .search-bar { flex-direction: column; }
+    .search-card, .paper-card, .conclusion-box { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>📚 不顯著結果文獻搜尋工具 <span style="color:var(--accent);font-size:0.7em;"></span></h1>
+    <p class="subtitle">多來源學術搜尋 + NLP 不顯著結果分類 + CrossRef 驗證——不需 API key 即可使用</p>
+  </div>
+
+  <!-- === Live Search === -->
+  <div class="search-card">
+    <div class="settings-toggle">
+      <button onclick="toggleSettings()">⚙️ API 設定（選填——用於 AI 中文摘要）</button>
+    </div>
+
+    <div class="settings-panel" id="settingsPanel">
+      <label>AI API Key（選填。支援 OpenAI / DeepSeek / OpenRouter / Groq 等相容 API）</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-...（選填，自動偵測 provider）">
+      <p class="help-text">
+        🔗 <b>推薦：安裝 <a href="https://ollama.com" target="_blank">Ollama</a> 本地 AI</b>（ollama pull qwen2.5:7b）→ 無限免費、離線可用<br>
+        🔗 或用雲端：<a href="https://openrouter.ai/settings/keys" target="_blank">OpenRouter</a>（50次/天免費）·
+        <a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek</a>（免費）·
+        <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a><br>
+        自動依 key 格式偵測 provider。Key 只在瀏覽器，不上傳伺服器。
+      </p>
+    </div>
+
+    <p style="font-weight:700;margin-bottom:8px;">🔍 即時搜尋（多來源學術資料庫）</p>
+    <p class="input-hint" style="margin-bottom:12px;">
+      🆓 <strong>不需 API key 即可搜尋</strong>——使用 OpenAlex（2.5 億篇）+ Semantic Scholar（2 億篇）+ CrossRef 三大免費學術資料庫。
+      設定 API key 可獲得更精確的搜尋結果和 AI 中文摘要。AI 在背景執行，不影響搜尋速度。<br>
+      <span style="display:inline-block;margin-top:8px;">
+        <strong>搜尋模式：</strong>
+        <button id="modeShowcase" onclick="setSearchMode('showcase')" style="padding:4px 12px;background:var(--accent);color:#fff;border:none;border-radius:14px;cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600;">📋 展示（5+5）</button>
+        <button id="modeDeep" onclick="setSearchMode('deep')" style="padding:4px 12px;background:#e8e0d4;color:var(--text);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-left:4px;">🔬 深度（完整搜尋）</button>
+      </span>
+    </p>
+    <p class="input-hint">💡 中英文皆可。英文關鍵字效果最佳（學術文獻以英文為主）。</p>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="輸入研究主題或關鍵字，中英文皆可，例如：IBA 對扦插發根的影響？腐植酸對組織培養的效果？…"
+             onkeydown="if(event.key==='Enter')doSearch()">
+      <button id="searchBtn" onclick="doSearch()">🔍 搜尋</button>
+    </div>
+
+  </div>
+
+  <!-- === Journal List (collapsible) === -->
+  <div class="journal-section">
+    <button class="journal-toggle" id="journalToggle" onclick="toggleJournals()" aria-expanded="false">
+      📋 已建立不顯著結果投稿制度的期刊（完整清單）
+      <span class="arrow" id="journalArrow">▶</span>
+    </button>
+    <div class="journal-body" id="journalBody">
+      <p class="journal-intro">
+    以下期刊已建立正式的不顯著／無效結果投稿政策。每本期刊的接受標準與審查制度不同，詳列如下。
+    點擊期刊名稱可直接前往投稿頁面。IF 資料來源：2025 JCR（Clarivate）。
+    <span style="display:inline-block;margin-left:8px;">
+      <span class="journal-if if-high">IF ≥ 4</span>
+      <span class="journal-if if-mid">IF 2–3.9</span>
+      <span class="journal-if if-low">IF &lt; 2</span>
+      <span class="journal-if if-na">無 JCR IF</span>
+    </span>
+    <br><span style="font-size:0.82rem;color:var(--muted);">⚠️ 無 IF 不代表期刊不好——常見原因：① 太新（創刊未滿 3 年，尚無足夠引用數據）② 收錄於 ESCI 但尚未升上 SCIE（ESCI 期刊不發 JCR IF）③ 未申請或未被 Web of Science 收錄（僅在 Scopus 等其他資料庫）。這些期刊仍經過同儕審查，對不顯著結果的接受度通常比高 IF 期刊更友善。</span>
+  </p>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://www.nature.com/srep/" target="_blank">Scientific Reports</a><span class="journal-if if-high">IF 4.9</span><span class="journal-tag">Springer Nature</span></div>
+        <div class="journal-desc">歡迎所有技術上合格的研究，不論結果方向。<br><span style="font-size:0.8rem;color:var(--muted);">📌 Springer Nature 旗下巨型期刊（Mega Journal），僅審查方法學正確性、不審新穎性。APC $2,850。非掠奪性期刊，但部分台灣醫療機構列為「不建議投稿」——因其刊名易與 Nature 本刊混淆，升等時可能引發爭議。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://journals.biologists.com/dmm" target="_blank">Disease Models &amp; Mechanisms</a><span class="journal-if if-mid">IF 3.3</span><span class="journal-tag">生物醫學</span></div>
+        <div class="journal-desc">2024 年社論明確呼籲重視 null data。<br><span style="font-size:0.8rem;color:var(--muted);">📌 The Company of Biologists（非營利、科學家治理，2025 年滿百年）出版。跨審稿人評論機制——審稿者互相可見對方報告，決策更透明。APC £2,500，可申請減免。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://journals.plos.org/plosone/s/criteria-for-publication" target="_blank">PLOS ONE</a><span class="journal-if if-mid">IF 2.8</span><span class="journal-tag">綜合</span></div>
+        <div class="journal-desc">明確列出「Studies reporting negative results」為接受的論文類型。設有「Positively Negative Collection」和「The Missing Pieces」專刊。審查僅看方法學品質與倫理，不看結果方向。<br><span style="font-size:0.8rem;color:var(--muted);">📌 非營利組織 PLOS 出版，2006 年首創 Mega Journal 模式。接受率 50–70%。2025 年 Nature 調查揭露少數編輯涉及紙漿工廠（paper mill）造假——期刊已清除涉事編輯，整體仍為正派期刊。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://bmcresnotes.biomedcentral.com/" target="_blank">BMC Research Notes</a><span class="journal-if if-low">IF 1.7</span><span class="journal-tag">Springer Nature</span></div>
+        <div class="journal-desc">鼓勵 null/negative findings，特別是簡短的研究筆記格式。<br><span style="font-size:0.8rem;color:var(--muted);">📌 Springer Nature 旗下 BMC 系列。專收「不夠新穎但方法學紮實」的短報告與資料筆記。APC €1,490。正派期刊，Factual Reporting 評級為 High。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://doi.org/10.4049/immunohorizons.2300032" target="_blank">ImmunoHorizons</a><span class="journal-if if-na">Scopus 1.8</span><span class="journal-tag doi">DOI</span></div>
+        <div class="journal-desc">美國免疫學家協會期刊，明確接受高品質的不顯著數據研究，對學生特別友善。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：收錄於 ESCI（非 SCIE），ESCI 期刊不發 JCR IF。<br>📌 美國免疫學家協會（AAI，1913 年成立）與 Oxford University Press 合作出版。專收 sound but incremental 的免疫學研究，審查僅看科學正確性。APC $1,360–1,700。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://www.pnrjournal.com" target="_blank">Journal of Pharmaceutical Negative Results</a><span class="journal-if if-na">Scopus 1.7</span><span class="journal-tag">藥學</span></div>
+        <div class="journal-desc">專門刊登藥學領域的 null/negative 發現。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：收錄於 ESCI（非 SCIE），ESCI 期刊不發 JCR IF。<br>📌 ESCI 收錄的開放取用期刊，專注藥學不顯著發現。⚠️ 曾有被列入掠奪性期刊名單的討論——投稿前建議查閱最新 Beall's List 或 Cabells 評估。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://www.f1000.com/resources-for-researchers/how-to-publish-your-research/f1000-publishing-model/" target="_blank">F1000Research</a><span class="journal-if if-na">Scopus 1.4</span><span class="journal-tag">綜合</span></div>
+        <div class="journal-desc">核心政策：所有有效的研究都值得發表，不論新穎性或結果方向。採用發表後同儕審查（post-publication peer review），文章先上線再公開審稿。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：發表後審稿模式不符 Clarivate 收錄標準，僅收錄於 Scopus。<br>📌 Taylor & Francis 旗下開放研究平台。審稿者身份與報告公開，需通過 2 位審稿者才被 PubMed 收錄。曾因「需具備博士學位方可投稿」的作者資格門檻引發爭議。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://www.cambridge.org/core/journals/experimental-results" target="_blank">Cambridge Experimental Results</a><span class="journal-if if-na">Scopus 1.4</span><span class="journal-tag">劍橋大學</span></div>
+        <div class="journal-desc">劍橋大學出版社的短格式期刊，專門發表 standalone experimental results（含不顯著／複製／補充結果），審稿快速。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：2020 年創刊，尚未被 SCIE 收錄（僅 Scopus）。<br>📌 劍橋大學出版社首創「開放同儕審查+評分卡」——審稿者身份公開、審查報告獲 DOI、可列在 CV 上。92% 審稿者支持此模式。2020 年創刊，指標穩定成長中。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://www.microbiologyresearch.org/content/journal/acmi" target="_blank">Access Microbiology</a><span class="journal-if if-na">Scopus 1.2</span><span class="journal-tag">微生物</span></div>
+        <div class="journal-desc">2024 年推出不顯著結果專刊，社論標題「Negative equity – the value of reporting negative results」。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：2019 年創刊，尚未被 SCIE 收錄（僅 Scopus）。<br>📌 Microbiology Society（英國微生物學會）出版。Soundness-only 審查。APC £700–950，多國機構有免除協議（含愛爾蘭、德國 ZB MED 聯盟等）。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://journal.trialanderror.org/" target="_blank">Journal of Trial and Error</a><span class="journal-if if-na">無 IF</span><span class="journal-tag">專門</span></div>
+        <div class="journal-desc">專門發表「做錯的實驗」、方法論失敗、意外發現。強調反思——不是只說「沒用」，而是檢討「為什麼沒用」。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：新興小眾期刊，尚未被 Web of Science 收錄。<br>📌 Utrecht University 碩士生 2018 年創立。Diamond OA——作者與讀者皆完全免費。雙盲審查，創辦人入選 Forbes 30 Under 30。由荷蘭皇家圖書館存檔，非營利經營。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="https://cab.unime.it/journals/index.php/PRNR/" target="_blank">Preliminary Reports and Negative Results in Life Science and Humanities</a><span class="journal-if if-na">新刊</span><span class="journal-tag">新創</span></div>
+        <div class="journal-desc">2024 年新創的開放取用期刊（ISSN 3035-062X），專注不顯著結果與初步報告。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：2024 年新創，尚無引用數據。<br>📌 義大利 Messina 大學出版。主編 Carmelo Vicario。曾專訪鏡像神經元發現者 Giacomo Rizzolatti 談不顯著結果的科學價值。太新，尚無長期記錄。</span></div>
+      </div>
+
+      <div class="journal-item">
+        <div class="journal-name"><a href="http://www.arjournals.com/ojs/" target="_blank">All Results Journals</a><span class="journal-if if-na">無 IF</span><span class="journal-tag">多領域</span></div>
+        <div class="journal-desc">涵蓋生物學（All Results Journals: Biol）、化學（Chem）、物理（Phys）等多領域的不顯著結果專門期刊。<br><span style="font-size:0.8rem;color:var(--muted);">🔹 無 JCR IF：獨立小眾出版，未收錄於 Web of Science。<br>📌 獨立出版商，專門刊登不顯著／無效結果。非掠奪性，但規模極小、更新頻率低。投稿前建議確認目前是否仍活躍出刊。</span></div>
+      </div>
+
+      <div class="journal-rr-note">
+        <strong>🔬 制度面解方：Registered Reports（RRs）</strong><br>
+        超過 <strong>200 本期刊</strong>提供 RR 選項（含 Elsevier、Royal Society、Cambridge University Press 等出版社）。<br>
+        兩階段審查——<strong>Stage 1</strong>（資料收集前）審查研究問題與方法，通過後發出 <strong>In-Principle Acceptance</strong>（不管結果如何都發表）；<strong>Stage 2</strong>（資料收集後）只檢查方法是否被正確執行。<br>
+        <strong>60%</strong> 的 RRs 報告了 null/negative 結果，而傳統文獻只有 5–20%。
+      </div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status" id="status"></div>
+
+  <!-- Progress bar (4 stages) -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-stages">
+      <span id="stage1">🔍 多來源搜尋</span>
+      <span id="stage2">🔬 NLP 分類</span>
+      <span id="stage3">✅ DOI 驗證</span>
+      <span id="stage4">📝 彙整報告</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <!-- Report -->
+  <div class="report" id="report"></div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>莊淳聿 · 115 年暑期專討 · 園藝領域不顯著結果登錄系統倡議</p>
+    <p style="margin-top:4px;font-size:0.8rem;">
+      學術來源：OpenAlex + Semantic Scholar + CrossRef 真實資料庫 ·
+      <a href="https://ollama.com" target="_blank" style="color:var(--accent);">安裝 Ollama 本地 AI</a> · <a href="https://openrouter.ai/settings/keys" target="_blank" style="color:var(--accent);">OpenRouter API Key</a>（選填，用於中文摘要）
+    </p>
+  </div>
+</div>
+
+<script>
+// ── Journal list toggle ──
+function toggleJournals() {
+  var body = document.getElementById('journalBody');
+  var toggle = document.getElementById('journalToggle');
+  var isOpen = body.classList.contains('open');
+  if (isOpen) {
+    body.classList.remove('open');
+    toggle.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+  } else {
+    body.classList.add('open');
+    toggle.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+}
+</script>
+<script src="journal_quality.js?v=1"></script>
+<script src="search-tool-formal.js?v=1"></script>
+
+</body>
+</html>
