@@ -2511,18 +2511,25 @@ async function runFullSearchPipeline(query, callbacks) {
     var openalexQuery = query;
     var crossrefQuery = query;
     var scoreQuery = query;
+
+    // Always call enrichQueryWithTranslation for scientific name detection.
+    // English queries: inline binomial regex (cheap, no API calls).
+    // Chinese queries: translation + AI/glossary scientific name.
     if (hasChinese(query)) {
       cb.onPhase && cb.onPhase(0, '🌐 正在翻譯中文查詢…');
-      var enriched = await enrichQueryWithTranslation(query);
-      if (enriched) {
+    }
+    var enriched = await enrichQueryWithTranslation(query);
+    if (enriched) {
+      if (hasChinese(query)) {
         openalexQuery = enriched.openalex || enriched.crossref || query;
         crossrefQuery = enriched.crossref || enriched.score || query;
         scoreQuery = enriched.score || query;
-        state._scientificName = enriched.scientificName || null;
-        state._scientificNameSource = enriched.scientificNameSource || 'none';
-        state._scientificNameExplicitNone = enriched.scientificNameExplicitNone || false;
         cb.onPhase && cb.onPhase(1, '🔍 OA→' + openalexQuery.substring(0, 40) + '… CR→' + crossrefQuery.substring(0, 40) + '…');
       }
+      // Scientific name extraction works for both English and Chinese queries
+      state._scientificName = enriched.scientificName || null;
+      state._scientificNameSource = enriched.scientificNameSource || 'none';
+      state._scientificNameExplicitNone = enriched.scientificNameExplicitNone || false;
     }
 
     // ── Phase 1: Multi-Source Search (split query strategy per source) ──
