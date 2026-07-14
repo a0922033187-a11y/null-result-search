@@ -706,14 +706,55 @@ async function geminiEnrichQuery(query) {
   }
 }
 
+// ── Common English plant-science terms that are NOT scientific names ──
+// Used to filter false positives when detecting Latin binomials in English queries.
+// These are technical terms that could appear as two-word phrases (e.g. "cutting propagation",
+// "adventitious root") and should never be treated as Genus species.
+function isCommonEnglishPlantTerm(word) {
+  var COMMON_ENGLISH_PLANT_TERMS = new Set([
+    // Plant science technical terms (multi-syllable, unmistakably English)
+    'cutting', 'cuttings', 'adventitious', 'vegetative', 'propagation',
+    'formation', 'development', 'temperature', 'greenhouse', 'nursery',
+    'treatment', 'treatments', 'induction', 'photosynthesis', 'chlorophyll',
+    'germplasm', 'resistance', 'tolerance', 'fertilizer', 'irrigation',
+    'conventional', 'sustainable', 'regeneration', 'management', 'production',
+    'application', 'associated', 'significant', 'potential', 'important',
+    'increased', 'decreased', 'improved', 'reduced', 'enhanced', 'compared',
+    'negative', 'ineffective', 'unsuccessful', 'failure', 'failed',
+    'results', 'result', 'effect', 'effects', 'study', 'studies', 'research',
+    'method', 'methods', 'analysis', 'review', 'system', 'model',
+    'factor', 'factors', 'condition', 'conditions', 'quality',
+    'test', 'tests', 'trial', 'trials',
+    // Common English plant morphology terms
+    'stem', 'stems', 'leaf', 'leaves', 'root', 'roots', 'shoot', 'shoots',
+    'plant', 'plants', 'fruit', 'fruits', 'seed', 'seeds', 'flower', 'flowers',
+    'tissue', 'water', 'soil', 'growth', 'light', 'stress', 'hormone',
+    'auxin', 'medium', 'field', 'control', 'response', 'culture',
+    'lateral', 'primary', 'secondary', 'terminal', 'axillary',
+    'apical', 'basal', 'nodal', 'first', 'second', 'third', 'report',
+    'species', 'genus', 'family', 'cultivar', 'variety', 'hybrid',
+    'different', 'during', 'after', 'before', 'between', 'under',
+    'through', 'above', 'below', 'more', 'less', 'higher', 'lower',
+  ]);
+  return COMMON_ENGLISH_PLANT_TERMS.has(word);
+}
+
 async function enrichQueryWithTranslation(query) {
   if (!hasChinese(query)) {
     // English query: try to detect scientific name directly from input
-    var sciName = parseScientificNameFromAI('(' + query + ')');  // Wrap to match (Genus species) pattern
-    if (!sciName) {
-      // Try detecting "Genus species" pattern anywhere in the query
-      var m = query.match(/([A-Z][a-z]{2,})\s+([a-z]{2,})/);
-      if (m) sciName = { genus: m[1].toLowerCase(), species: m[2].toLowerCase(), source: 'inline' };
+    // Iterate all "Word1 word2" pairs to find a Latin binomial (case-insensitive genus)
+    // Skip common English plant-science terms that are not scientific names
+    var sciName = null;
+    var binomialRe = /\b([A-Za-z][a-z]{2,})\s+([a-z]{2,})\b/g;
+    var bm;
+    while ((bm = binomialRe.exec(query)) !== null) {
+      var candGenus = bm[1].toLowerCase();
+      var candSpecies = bm[2].toLowerCase();
+      // Skip pairs where either word is a common English technical term
+      if (!isCommonEnglishPlantTerm(candGenus) && !isCommonEnglishPlantTerm(candSpecies)) {
+        sciName = { genus: candGenus, species: candSpecies, source: 'inline' };
+        break;
+      }
     }
     return {openalex: query, crossref: query, score: query, scientificName: sciName || null, scientificNameSource: sciName ? sciName.source : 'none'};
   }
@@ -1397,10 +1438,11 @@ function parseScientificNameFromAI(text) {
   // Check for explicit "(none)" — AI says no plant specified
   if (/\(none\)/i.test(text)) return { genus: null, species: null, source: 'ai-none' };
   // Match parenthesized Latin binomial: (Glycine max), (Litsea cubeba), etc.
-  var m = text.match(/\(([A-Z][a-z]{2,})\s+([a-z]{2,})\)/);
+  // Accept both uppercase and lowercase genus (AI may return lowercase)
+  var m = text.match(/\(([A-Za-z][a-z]{2,})\s+([a-z]{2,})\)/);
   if (m) return { genus: m[1].toLowerCase(), species: m[2].toLowerCase(), source: 'ai' };
-  // Try genus-only: (Episcia)
-  var m2 = text.match(/\(([A-Z][a-z]{2,})\)/);
+  // Try genus-only: (Episcia) — also case-insensitive
+  var m2 = text.match(/\(([A-Za-z][a-z]{2,})\)/);
   if (m2) return { genus: m2[1].toLowerCase(), species: null, source: 'ai-genus-only' };
   return null;
 }
@@ -1408,7 +1450,7 @@ function parseScientificNameFromAI(text) {
 // Strip scientific name annotation from AI keywords (keep only the keywords)
 function stripScientificNameAnnotation(text) {
   if (!text) return text;
-  return text.replace(/\s*\(none\)\s*/gi, ' ').replace(/\s*\([A-Z][a-z]+\s+[a-z]{2,}\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.replace(/\s*\(none\)\s*/gi, ' ').replace(/\s*\([A-Za-z][a-z]+\s+[a-z]{2,}\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function filterRelevant(papers, scoreQuery, openalexQuery, scientificName, scientificNameExplicitNone) {
