@@ -166,13 +166,15 @@ var DOMAIN_FILTER = 'concepts.id:' + DOMAIN_CONCEPT_IDS.join('|');
 
 // ── Journal quality lookup (from journal_quality.js) ──
 function getJournalQuality(paper) {
-  // Returns {tier: 'Q1'|'Q2'|'Q3'|'Q4', h_index: number} or null
-  if (typeof JOURNAL_QUALITY === 'undefined') return null;
+  // Returns {tier, h_index} for rated journals, or {reason: '...'} explaining why
+  if (typeof JOURNAL_QUALITY === 'undefined') return { reason: '品質資料庫未載入' };
 
   // Try ISSN from OpenAlex result (primary_location.source.issn)
-  // Not yet extracted — we'll add it to searchOpenAlex
   var issns = paper.issn_l ? [paper.issn_l] : [];
   if (paper.issns && paper.issns.length > 0) issns = issns.concat(paper.issns);
+
+  // No ISSN at all — can't look up quality
+  if (issns.length === 0) return { reason: '期刊資料不足（無 ISSN）' };
 
   for (var i = 0; i < issns.length; i++) {
     var issn = issns[i];
@@ -182,7 +184,8 @@ function getJournalQuality(paper) {
       return { tier: tier, h_index: h };
     }
   }
-  return null;
+  // Has ISSN but not in quality database
+  return { reason: '期刊未收錄於評等資料庫' };
 }
 var SEMANTIC_SCHOLAR_API = 'https://api.semanticscholar.org/graph/v1/paper/search';
 var CROSSREF_API = 'https://api.crossref.org/works';
@@ -3297,10 +3300,10 @@ function renderPaperCard(p, badgeType) {
       '<span style="color:' + (qColors[quality.tier] || '#999') + ';font-weight:700;">' + quality.tier + '</span>' +
       ' <span style="color:var(--muted);">· h-index: ' + quality.h_index + citationStr + '</span>' +
       '</div>');
-  } else {
-    // Journal not in quality database yet — show placeholder
+  } else if (quality && quality.reason) {
+    // Journal has no rating — explain why
     parts.push('<div style="font-size:0.78rem;margin-bottom:4px;">' +
-      '<span style="color:#aaa;font-weight:700;" title="此期刊尚未收錄於品質資料庫">Q?</span>' +
+      '<span style="color:#aaa;">' + esc(quality.reason) + '</span>' +
       ' <span style="color:var(--muted);">' + (citationStr ? citationStr.substring(3) : '') + '</span>' +
       '</div>');
   }
