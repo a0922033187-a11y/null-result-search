@@ -8,6 +8,7 @@
 //   - 架構不再依賴 glossary 詞序（前 3 字→查詢 A，剩餘→查詢 B）
 //   - 教訓：glossary 完整≠查詢召回完整，雙呼叫 > 單呼叫+爆炸詞庫
 //
+var LAST_UPDATED = '2026-07-21 19:00';
 // v9.5 (2026-07-21): Glossary 技術詞全應用 + V5 實驗（已還原）
 // v9.4 (2026-07-21): HTML 命名實體清理（&lsquo; &rsquo; &ldquo; &rdquo; &ndash; &mdash; &hellip; &nbsp;）
 // v9.3 (2026-07-21): S2 搜尋優化（stripNegativeIntentWords）+ 學名誤判修復 + 來源顯示
@@ -4516,6 +4517,10 @@ async function runAIBackground(result, query) {
 
 // ── Settings ──
 document.addEventListener('DOMContentLoaded', function() {
+  // Auto-update timestamp from JS version
+  var el = document.getElementById('last-updated');
+  if (el && typeof LAST_UPDATED !== 'undefined') el.textContent = '最後更新：' + LAST_UPDATED;
+
   // Restore saved API key (supports both old and new storage keys)
   var saved = localStorage.getItem('ai_api_key') || localStorage.getItem('gemini_api_key');
   if (saved) document.getElementById('apiKeyInput').value = saved;
