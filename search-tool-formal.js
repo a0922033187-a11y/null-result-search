@@ -1831,6 +1831,7 @@ function rerankPapers(papers) {
     var citations = p.citationCount || 0;
     var citationScore = Math.min(citations / 50, 1.0);
     var speciesBonus = p._speciesBonus || 0;
+    var speciesLevel = p._speciesLevel || 0;
     p._rankScore = technicalScore * 0.85 + citationScore * 0.08 + recencyScore * 0.07 + speciesBonus;
     // Store breakdown for transparency
     p._scoreBreakdown = {
