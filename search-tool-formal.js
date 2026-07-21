@@ -1,12 +1,13 @@
 // ═══════════════════════════════════════════════════════════
-// Negative Result Search Tool v10.0
+// Negative Result Search Tool v9.5
 // ── 多來源搜尋 + 閘門系統 + NLP 分類 + 匯出 ──
 //
-// v10.0 (2026-07-21): 🔴 V5 Reranker — 物種匹配為主，技術關鍵字為輔
-//   架構變更：speciesMatch × 0.45 + technical × 0.35 + citation × 0.10 + recency × 0.10
-//   效果：對的植物 + 不同用詞 → 不下沉。不再依賴 glossary 完整性。
-//
-// v9.5 (2026-07-21): Glossary 技術詞全應用 — 不再漏掉同義詞論文
+// v9.5 (2026-07-21): Glossary 技術詞全應用 + V5 實驗（已還原）
+//   - buildQueryWords() 改用 applyGlossary()（全 glossary）而非只取 PLANT_NAME_KEYS
+//   - Glossary 擴充：扦插/發根/生根 互補同義詞（rooting↔cuttings）
+//   - V5 Reranker 實驗失敗→已還原 V4：物種×0.45 導致不相關植物論文氾濫
+//   - 教訓：speciesBonus (+3.0) 作為加成項 > speciesMatchScore (×0.45) 作為主導項
+//     [[v5-reranker-experiment-failed]]
 //   - buildQueryWords() 改用 applyGlossary()（全 glossary）而非只取 PLANT_NAME_KEYS
 //   - 技術詞（扦插→rooting、發根→cuttings）現在正確加入 scoreQuery
 //   - Glossary 擴充：扦插/發根/生根 互補同義詞（rooting↔cuttings）
@@ -1813,15 +1814,11 @@ async function searchSuggestedPapers(originalQuery, mainSearchQuery) {
   return results;
 }
 
-// ── V5 Reranker: species match × 0.45 + technical × 0.35 + citation × 0.10 + recency × 0.10 ──
-// KEY INSIGHT (2026-07-21): species match provides the FLOOR — a paper about the RIGHT
-// plant should always outrank a paper about the WRONG plant, even if it doesn't use
-// our glossary's exact keywords. This makes the system robust against glossary gaps.
-//   speciesMatchScore: 0-1 normalized from species level
-//     Lv.2 + all-in-title → 1.0  (perfect match)
-//     Lv.2 mixed           → 0.8
-//     Lv.1                 → 0.5  (genus only or partial)
-//     Lv.0                 → 0.0  (wrong plant — already ×0.3 in techScore)
+// ── V4 Reranker (restored 2026-07-21): technicalScore + citation + recency + species bonus ──
+// technicalScore × 0.85 + citation × 0.08 + recency × 0.07 + speciesBonus
+// V5 (speciesMatch × 0.45) was tried and reverted — it let wrong-plant papers with
+// strong technique keywords (cuttings/rooting) outrank right-plant papers.
+// The V4 formula's speciesBonus (+0 to +3.0) provides better discrimination.
 function rerankPapers(papers) {
   if (papers.length <= 1) return papers;
   var currentYear = new Date().getFullYear();
@@ -1833,21 +1830,10 @@ function rerankPapers(papers) {
     var technicalScore = p._technicalScore || 0;
     var citations = p.citationCount || 0;
     var citationScore = Math.min(citations / 50, 1.0);
-    var speciesLevel = p._speciesLevel || 0;
     var speciesBonus = p._speciesBonus || 0;
-    // Normalize species match to 0-1: gives right-plant papers a guaranteed floor
-    var speciesMatchScore = 0;
-    if (speciesLevel === 2) {
-      speciesMatchScore = speciesBonus >= 3.0 ? 1.0 : 0.8;  // all-in-title vs title+abstract
-    } else if (speciesLevel === 1) {
-      speciesMatchScore = 0.5;
-    }
-    // speciesLevel 0 → speciesMatchScore 0 (wrong plant)
-    // V5 formula: species drives ranking, technique refines ordering
-    p._rankScore = speciesMatchScore * 0.45 + technicalScore * 0.35 + citationScore * 0.10 + recencyScore * 0.10;
+    p._rankScore = technicalScore * 0.85 + citationScore * 0.08 + recencyScore * 0.07 + speciesBonus;
     // Store breakdown for transparency
     p._scoreBreakdown = {
-      speciesMatchScore: speciesMatchScore,
       technicalScore: technicalScore,
       citationScore: citationScore,
       recency: recencyScore,
