@@ -1,6 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// Negative Result Search Tool v9.1
+// Negative Result Search Tool v9.2
 // ── 多來源搜尋 + 閘門系統 + NLP 分類 + 匯出 ──
+//
+// v9.2 (2026-07-21): Bugfix — 三項修正
+//   - 修復：英文查詢中的常見功能詞（have/has/did/was 等）被誤判為學名
+//   - 修復：Semantic Scholar 回傳 0 篇時被隱藏，現在一律顯示三來源計數
+//   - 修復：學名偵測列加入 word-break 防止視覺截斷 + inline 來源改為「內文偵測」
 //
 // v9.1 (2026-07-12): NLP 分類器調優 — 減少 false positive
 //   - NDR-inspired patterns 權重砍半 (2→1, 1→0): Discussion boilerplate 不該觸發
@@ -735,6 +740,14 @@ function isCommonEnglishPlantTerm(word) {
     'species', 'genus', 'family', 'cultivar', 'variety', 'hybrid',
     'different', 'during', 'after', 'before', 'between', 'under',
     'through', 'above', 'below', 'more', 'less', 'higher', 'lower',
+    // ── Common English words that are NEVER scientific names ──
+    // (false-positive guard for binomial regex in enrichQueryWithTranslation)
+    'have', 'has', 'had', 'does', 'did', 'done', 'not', 'nor',
+    'was', 'were', 'are', 'can', 'may', 'any', 'some', 'much',
+    'also', 'very', 'just', 'only', 'even', 'then', 'than',
+    'over', 'into', 'onto', 'upon', 'most', 'many', 'each',
+    'both', 'such', 'same', 'well', 'with', 'that', 'this',
+    'will', 'would', 'could', 'shall', 'should', 'been', 'being',
   ]);
   return COMMON_ENGLISH_PLANT_TERMS.has(word);
 }
@@ -2893,9 +2906,17 @@ function renderReport(result) {
   if (result.state && result.state.searchStats) {
     var ss = result.state.searchStats;
     var srcParts = [];
-    if (ss.sources.openalex > 0) srcParts.push('OpenAlex: ' + ss.sources.openalex + ' 篇');
-    if (ss.sources.semantic_scholar > 0) srcParts.push('Semantic Scholar: ' + ss.sources.semantic_scholar + ' 篇');
-    if (ss.sources.crossref > 0) srcParts.push('CrossRef: ' + ss.sources.crossref + ' 篇');
+    // Always show all 3 sources so user knows each was searched
+    var oaCount = ss.sources.openalex || 0;
+    var s2Count = ss.sources.semantic_scholar || 0;
+    var crCount = ss.sources.crossref || 0;
+    srcParts.push('OpenAlex: ' + oaCount + ' 篇');
+    srcParts.push('Semantic Scholar: ' + s2Count + ' 篇');
+    srcParts.push('CrossRef: ' + crCount + ' 篇');
+    // Show S2 error hint if it returned 0 while others had results
+    if (s2Count === 0 && (oaCount > 0 || crCount > 0)) {
+      srcParts.push('⚠️ S2 無結果（可能對負面關鍵字敏感，不影響其他來源）');
+    }
     var modeLabel = ss.mode === 'showcase' ? '📋 展示模式' : '🔬 深度搜尋';
     var filterInfo = '';
     var filterParts = [];
@@ -2926,8 +2947,9 @@ function renderReport(result) {
       // AI explicitly said no plant — correct behavior, no warning needed
       // (tech query like "節水灌溉" — no plant was specified)
     } else if (result.scientificName && result.scientificName.genus) {
-      var sciSource = result.scientificNameSource === 'ai' ? 'AI' : (result.scientificNameSource === 'glossary' ? '詞典' : result.scientificNameSource);
-      parts.push('<div style="font-size:0.8rem;color:#6b8e4e;margin-bottom:12px;">' +
+      var sciSourceMap = { 'ai': 'AI', 'glossary': '詞典', 'inline': '內文偵測', 'ai-none': 'AI（無植物）' };
+      var sciSource = sciSourceMap[result.scientificNameSource] || result.scientificNameSource;
+      parts.push('<div style="font-size:0.8rem;color:#6b8e4e;margin-bottom:12px;word-break:break-all;">' +
         '🧬 學名偵測：<b><i>' + esc(result.scientificName.genus.charAt(0).toUpperCase() + result.scientificName.genus.slice(1) +
         ' ' + (result.scientificName.species || 'sp.')) + '</i></b>（來源：' + sciSource + '）— Layer 1 物種閘門已啟用' +
         '</div>');
@@ -3618,9 +3640,15 @@ function buildExportHTML(data) {
   if (data.searchStats) {
     var ss = data.searchStats;
     var srcParts = [];
-    if (ss.sources && ss.sources.openalex > 0) srcParts.push('OpenAlex: ' + ss.sources.openalex + ' 篇');
-    if (ss.sources && ss.sources.semantic_scholar > 0) srcParts.push('Semantic Scholar: ' + ss.sources.semantic_scholar + ' 篇');
-    if (ss.sources && ss.sources.crossref > 0) srcParts.push('CrossRef: ' + ss.sources.crossref + ' 篇');
+    var oaCount2 = (ss.sources && ss.sources.openalex) ? ss.sources.openalex : 0;
+    var s2Count2 = (ss.sources && ss.sources.semantic_scholar) ? ss.sources.semantic_scholar : 0;
+    var crCount2 = (ss.sources && ss.sources.crossref) ? ss.sources.crossref : 0;
+    srcParts.push('OpenAlex: ' + oaCount2 + ' 篇');
+    srcParts.push('Semantic Scholar: ' + s2Count2 + ' 篇');
+    srcParts.push('CrossRef: ' + crCount2 + ' 篇');
+    if (s2Count2 === 0 && (oaCount2 > 0 || crCount2 > 0)) {
+      srcParts.push('⚠️ S2 無結果（可能對負面關鍵字敏感）');
+    }
     var modeLabel = ss.mode === 'showcase' ? '展示模式' : '深度搜尋';
     parts.push('<div class="stats">' +
       '<strong>來源：</strong>OpenAlex + Semantic Scholar + CrossRef（真實學術資料庫）<br>' +
