@@ -1,6 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// Negative Result Search Tool v9.2
+// Negative Result Search Tool v9.3
 // ── 多來源搜尋 + 閘門系統 + NLP 分類 + 匯出 ──
+//
+// v9.3 (2026-07-21): S2 搜尋優化 — 不要再浪費 2 億篇
+//   - 新增 stripNegativeIntentWords()：S2 只搜主題詞，不搜結果判斷詞
+//   - 「no effect / ineffective / have no」等負面意圖詞從 S2 查詢中剝離
+//   - S2 用純主題查詢 → 廣泛召回 → NLP 分類器判斷不顯著結果
 //
 // v9.2 (2026-07-21): Bugfix — 三項修正
 //   - 修復：英文查詢中的常見功能詞（have/has/did/was 等）被誤判為學名
@@ -1117,6 +1122,48 @@ var RELEVANCE_STOP_WORDS = new Set([
   'results', 'result', 'effect', 'effects', 'study', 'studies', 'research',
   'using', 'use', 'used', 'based', 'including', 'include', 'associated',
 ]);
+
+// ── S2 Query Cleaner: strip negative-result intent words ──
+// Semantic Scholar's search engine is topic-based — it chokes on
+// "no effect", "ineffective", "have no" etc. because academic titles
+// don't contain those phrases. We strip result-direction words and let
+// our own NLP classifier identify negative results from the returned papers.
+// This way S2 casts a WIDE net on the TOPIC, and our classifier filters.
+var NEGATIVE_INTENT_PATTERNS = [
+  /\bno effect\b/i, /\bno significant\b/i, /\bnot effective\b/i,
+  /\bnot significant\b/i, /\bdid not\b/i, /\bdoes not\b/i,
+  /\bwithout effect\b/i, /\bno benefit\b/i, /\bno difference\b/i,
+  /\bfailed to\b/i, /\bwas not\b/i, /\bwere not\b/i,
+  /\bhave no\b/i, /\bhas no\b/i, /\bshowed no\b/i, /\bshown no\b/i,
+  /\bfound no\b/i, /\brevealed no\b/i,
+];
+var NEGATIVE_INTENT_WORDS = new Set([
+  'negative', 'null', 'ineffective', 'unsuccessful', 'failure', 'failed',
+  'ineffective', 'inefficacy', 'ineffectiveness',
+]);
+
+function stripNegativeIntentWords(query) {
+  // Remove negative-result phrases and words from query,
+  // keeping only subject-matter terms (species, technique, treatment).
+  // Used for Semantic Scholar which needs clean topic queries.
+  var cleaned = query;
+  for (var i = 0; i < NEGATIVE_INTENT_PATTERNS.length; i++) {
+    cleaned = cleaned.replace(NEGATIVE_INTENT_PATTERNS[i], ' ');
+  }
+  // Also remove standalone negative-intent words
+  var words = cleaned.split(/\s+/);
+  var kept = [];
+  for (var j = 0; j < words.length; j++) {
+    var w = words[j].toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (w.length < 2) continue;
+    if (NEGATIVE_INTENT_WORDS.has(w)) continue;
+    if (RELEVANCE_STOP_WORDS.has(w)) continue;
+    kept.push(words[j]);
+  }
+  var result = kept.join(' ').replace(/\s+/g, ' ').trim();
+  // If we stripped everything (extreme edge case), return original
+  return result.length > 0 ? result : query;
+}
 
 function extractQueryKeywords(query) {
   // Extract meaningful content keywords from the query
@@ -2548,10 +2595,14 @@ async function runFullSearchPipeline(query, callbacks) {
     // ── Phase 1: Multi-Source Search (split query strategy per source) ──
     cb.onPhase && cb.onPhase(1, '🔍 正在從多個學術來源搜尋（' + modeLabel + '）…');
 
+    // S2 query: strip negative-result intent words so S2 searches the TOPIC,
+    // not the result direction. Our NLP classifier handles negative detection.
+    var s2Query = stripNegativeIntentWords(crossrefQuery);
+
     var searchLimit = getSearchLimit();
     var [oaResults, s2Results, crResults] = await Promise.allSettled([
       searchOpenAlex(openalexQuery, searchLimit),
-      searchSemanticScholar(crossrefQuery, searchLimit),
+      searchSemanticScholar(s2Query, searchLimit),
       searchCrossRef(crossrefQuery, searchLimit),
     ]);
 
