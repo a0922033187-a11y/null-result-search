@@ -1,6 +1,10 @@
 // ═══════════════════════════════════════════════════════════
-// Negative Result Search Tool v9.3
+// Negative Result Search Tool v9.4
 // ── 多來源搜尋 + 閘門系統 + NLP 分類 + 匯出 ──
+//
+// v9.4 (2026-07-21): HTML 命名實體清理 — 不再出現 ^|^lsquo; 亂碼
+//   - cleanApiText() 新增 &lsquo; &rsquo; &ldquo; &rdquo; &ndash; &mdash; &hellip; &nbsp; 轉換
+//   - 這些實體常見於 CrossRef 書目資料（期刊名、標題中的 curly quotes）
 //
 // v9.3 (2026-07-21): S2 搜尋優化 — 不要再浪費 2 億篇
 //   - 新增 stripNegativeIntentWords()：S2 只搜主題詞，不搜結果判斷詞
@@ -201,7 +205,16 @@ function cleanApiText(text) {
   if (!text) return '';
   var s = String(text);
   // Step 1: Unescape ALL HTML entities (must be BEFORE tag stripping)
-  s = s.replace(/&lt;/g, '<')
+  // Named entities first (before &amp; → & which would break them)
+  s = s.replace(/&lsquo;/g, '‘')   // ' left single quote
+       .replace(/&rsquo;/g, '’')   // ' right single quote
+       .replace(/&ldquo;/g, '“')   // " left double quote
+       .replace(/&rdquo;/g, '”')   // " right double quote
+       .replace(/&ndash;/g, '–')   // – en dash
+       .replace(/&mdash;/g, '—')   // — em dash
+       .replace(/&hellip;/g, '…')  // … ellipsis
+       .replace(/&nbsp;/g, ' ')         // non-breaking space
+       .replace(/&lt;/g, '<')
        .replace(/&gt;/g, '>')
        .replace(/&amp;/g, '&')
        .replace(/&quot;/g, '"')
