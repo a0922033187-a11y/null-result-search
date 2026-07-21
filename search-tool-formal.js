@@ -1,6 +1,10 @@
 // ═══════════════════════════════════════════════════════════
-// Negative Result Search Tool v9.5
+// Negative Result Search Tool v10.0
 // ── 多來源搜尋 + 閘門系統 + NLP 分類 + 匯出 ──
+//
+// v10.0 (2026-07-21): 🔴 V5 Reranker — 物種匹配為主，技術關鍵字為輔
+//   架構變更：speciesMatch × 0.45 + technical × 0.35 + citation × 0.10 + recency × 0.10
+//   效果：對的植物 + 不同用詞 → 不下沉。不再依賴 glossary 完整性。
 //
 // v9.5 (2026-07-21): Glossary 技術詞全應用 — 不再漏掉同義詞論文
 //   - buildQueryWords() 改用 applyGlossary()（全 glossary）而非只取 PLANT_NAME_KEYS
@@ -1809,8 +1813,15 @@ async function searchSuggestedPapers(originalQuery, mainSearchQuery) {
   return results;
 }
 
-// ── V4 Reranker: technicalScore + citation + recency + species bonus ──
-// technicalScore × 0.85 + citation × 0.08 + recency × 0.07 + speciesBonus
+// ── V5 Reranker: species match × 0.45 + technical × 0.35 + citation × 0.10 + recency × 0.10 ──
+// KEY INSIGHT (2026-07-21): species match provides the FLOOR — a paper about the RIGHT
+// plant should always outrank a paper about the WRONG plant, even if it doesn't use
+// our glossary's exact keywords. This makes the system robust against glossary gaps.
+//   speciesMatchScore: 0-1 normalized from species level
+//     Lv.2 + all-in-title → 1.0  (perfect match)
+//     Lv.2 mixed           → 0.8
+//     Lv.1                 → 0.5  (genus only or partial)
+//     Lv.0                 → 0.0  (wrong plant — already ×0.3 in techScore)
 function rerankPapers(papers) {
   if (papers.length <= 1) return papers;
   var currentYear = new Date().getFullYear();
@@ -1822,10 +1833,21 @@ function rerankPapers(papers) {
     var technicalScore = p._technicalScore || 0;
     var citations = p.citationCount || 0;
     var citationScore = Math.min(citations / 50, 1.0);
+    var speciesLevel = p._speciesLevel || 0;
     var speciesBonus = p._speciesBonus || 0;
-    p._rankScore = technicalScore * 0.85 + citationScore * 0.08 + recencyScore * 0.07 + speciesBonus;
+    // Normalize species match to 0-1: gives right-plant papers a guaranteed floor
+    var speciesMatchScore = 0;
+    if (speciesLevel === 2) {
+      speciesMatchScore = speciesBonus >= 3.0 ? 1.0 : 0.8;  // all-in-title vs title+abstract
+    } else if (speciesLevel === 1) {
+      speciesMatchScore = 0.5;
+    }
+    // speciesLevel 0 → speciesMatchScore 0 (wrong plant)
+    // V5 formula: species drives ranking, technique refines ordering
+    p._rankScore = speciesMatchScore * 0.45 + technicalScore * 0.35 + citationScore * 0.10 + recencyScore * 0.10;
     // Store breakdown for transparency
     p._scoreBreakdown = {
+      speciesMatchScore: speciesMatchScore,
       technicalScore: technicalScore,
       citationScore: citationScore,
       recency: recencyScore,
@@ -1835,7 +1857,7 @@ function rerankPapers(papers) {
       keywordHits: p._keywordHits || {titleHits:[],abstractHits:[]},
       plantPenalty: p._plantPenalty || false,
       plantHits: p._plantHits || [],
-      speciesLevel: p._speciesLevel || 0,
+      speciesLevel: speciesLevel,
       unigramScore: p._unigramScore || 0,
       techNumerator: p._techNumerator || 0,
       techDenominator: p._techDenominator || 1,
