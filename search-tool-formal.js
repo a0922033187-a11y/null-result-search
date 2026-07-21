@@ -494,12 +494,14 @@ function filterQualitySuggestions(suggested, query) {
 // are translated and appended — NOT dropped.
 var ZH_EN_GLOSSARY = {
   // Propagation & horticulture
-  '扦插': 'cuttings cutting propagation rooting adventitious root',
-  '扦插繁殖': 'cutting propagation vegetative propagation rooting',
+  // NOTE: NO bare "root" — it matches "root extract" in unrelated papers (e.g. essential oils)
+  // Use "rooting" (verb/gerund) and "adventitious" which are specific to propagation context.
+  '扦插': 'cuttings cutting propagation rooting adventitious',
+  '扦插繁殖': 'cutting propagation vegetative propagation rooting adventitious',
   '插穗': 'cuttings stem cuttings rooting',
-  '發根': 'rooting adventitious root root formation cuttings',
-  '不定根': 'adventitious root rooting',
-  '生根': 'rooting root formation cuttings propagation',
+  '發根': 'rooting adventitious root-formation cuttings',
+  '不定根': 'adventitious rooting',
+  '生根': 'rooting root-formation cuttings propagation',
   '繁殖': 'propagation',
   '無性繁殖': 'vegetative propagation clonal propagation',
   '組織培養': 'tissue culture micropropagation',
