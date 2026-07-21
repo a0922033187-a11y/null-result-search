@@ -1,6 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// Negative Result Search Tool v9.4
+// Negative Result Search Tool v9.5
 // ── 多來源搜尋 + 閘門系統 + NLP 分類 + 匯出 ──
+//
+// v9.5 (2026-07-21): Glossary 技術詞全應用 — 不再漏掉同義詞論文
+//   - buildQueryWords() 改用 applyGlossary()（全 glossary）而非只取 PLANT_NAME_KEYS
+//   - 技術詞（扦插→rooting、發根→cuttings）現在正確加入 scoreQuery
+//   - Glossary 擴充：扦插/發根/生根 互補同義詞（rooting↔cuttings）
 //
 // v9.4 (2026-07-21): HTML 命名實體清理 — 不再出現 ^|^lsquo; 亂碼
 //   - cleanApiText() 新增 &lsquo; &rsquo; &ldquo; &rdquo; &ndash; &mdash; &hellip; &nbsp; 轉換
@@ -484,12 +489,12 @@ function filterQualitySuggestions(suggested, query) {
 // are translated and appended — NOT dropped.
 var ZH_EN_GLOSSARY = {
   // Propagation & horticulture
-  '扦插': 'cuttings cutting propagation',
-  '扦插繁殖': 'cutting propagation vegetative propagation',
-  '插穗': 'cuttings stem cuttings',
-  '發根': 'rooting adventitious root',
-  '不定根': 'adventitious root',
-  '生根': 'rooting root formation',
+  '扦插': 'cuttings cutting propagation rooting adventitious root',
+  '扦插繁殖': 'cutting propagation vegetative propagation rooting',
+  '插穗': 'cuttings stem cuttings rooting',
+  '發根': 'rooting adventitious root root formation cuttings',
+  '不定根': 'adventitious root rooting',
+  '生根': 'rooting root formation cuttings propagation',
   '繁殖': 'propagation',
   '無性繁殖': 'vegetative propagation clonal propagation',
   '組織培養': 'tissue culture micropropagation',
@@ -838,12 +843,12 @@ async function enrichQueryWithTranslation(query) {
   function buildQueryWords(translation) {
     var words = englishParts.slice();
     if (chineseText) {
-      var pks = Array.from(PLANT_NAME_KEYS).sort(function(a, b) { return b.length - a.length; });
-      for (var pk2 = 0; pk2 < pks.length; pk2++) {
-        var zh = pks[pk2];
-        if (chineseText.indexOf(zh) !== -1) {
-          words = words.concat((ZH_EN_GLOSSARY[zh] || '').toLowerCase().split(/\s+/));
-        }
+      // Apply FULL glossary (plant names + technical terms like 扦插→rooting)
+      // Previously only PLANT_NAME_KEYS were added — technical terms were skipped,
+      // causing papers using synonyms (e.g. "rooting" vs "cuttings") to score zero.
+      var glossaryTerms = applyGlossary(chineseText);
+      for (var g = 0; g < glossaryTerms.length; g++) {
+        words = words.concat(glossaryTerms[g].toLowerCase().split(/\s+/));
       }
     }
     if (translation) words = words.concat(translation.toLowerCase().split(/\s+/));
