@@ -1,23 +1,16 @@
 // ═══════════════════════════════════════════════════════════
-// Negative Result Search Tool v9.5
+// Negative Result Search Tool v10.0
 // ── 多來源搜尋 + 閘門系統 + NLP 分類 + 匯出 ──
 //
+// v10.0 (2026-07-21): 🔴 泛用化 — 不再為個別關鍵字調整架構
+//   - CrossRef 雙查詢：兩次呼叫各 ≤5 詞，合併覆蓋所有 glossary 同義詞
+//   - 移除 has-abstract:true filter（2026 新論文無摘要被直接排除）
+//   - 架構不再依賴 glossary 詞序（前 3 字→查詢 A，剩餘→查詢 B）
+//   - 教訓：glossary 完整≠查詢召回完整，雙呼叫 > 單呼叫+爆炸詞庫
+//
 // v9.5 (2026-07-21): Glossary 技術詞全應用 + V5 實驗（已還原）
-//   - buildQueryWords() 改用 applyGlossary()（全 glossary）而非只取 PLANT_NAME_KEYS
-//   - Glossary 擴充：扦插/發根/生根 互補同義詞（rooting↔cuttings）
-//   - V5 Reranker 實驗失敗→已還原 V4：物種×0.45 導致不相關植物論文氾濫
-//   - 教訓：speciesBonus (+3.0) 作為加成項 > speciesMatchScore (×0.45) 作為主導項
-//     [[v5-reranker-experiment-failed]]
-//   - buildQueryWords() 改用 applyGlossary()（全 glossary）而非只取 PLANT_NAME_KEYS
-//   - 技術詞（扦插→rooting、發根→cuttings）現在正確加入 scoreQuery
-//   - Glossary 擴充：扦插/發根/生根 互補同義詞（rooting↔cuttings）
-//
-// v9.4 (2026-07-21): HTML 命名實體清理 — 不再出現 ^|^lsquo; 亂碼
-//   - cleanApiText() 新增 &lsquo; &rsquo; &ldquo; &rdquo; &ndash; &mdash; &hellip; &nbsp; 轉換
-//   - 這些實體常見於 CrossRef 書目資料（期刊名、標題中的 curly quotes）
-//
-// v9.3 (2026-07-21): S2 搜尋優化 — 不要再浪費 2 億篇
-//   - 新增 stripNegativeIntentWords()：S2 只搜主題詞，不搜結果判斷詞
+// v9.4 (2026-07-21): HTML 命名實體清理（&lsquo; &rsquo; &ldquo; &rdquo; &ndash; &mdash; &hellip; &nbsp;）
+// v9.3 (2026-07-21): S2 搜尋優化（stripNegativeIntentWords）+ 學名誤判修復 + 來源顯示
 //   - 「no effect / ineffective / have no」等負面意圖詞從 S2 查詢中剝離
 //   - S2 用純主題查詢 → 廣泛召回 → NLP 分類器判斷不顯著結果
 //
@@ -494,13 +487,14 @@ function filterQualitySuggestions(suggested, query) {
 // are translated and appended — NOT dropped.
 var ZH_EN_GLOSSARY = {
   // Propagation & horticulture
-  // 🔴 NO bare "root" and NO hyphenated "root-formation" — extractQueryKeywords()
-  //    strips hyphens via /[^a-z0-9\s]/g, turning "root-formation" → "root"+"formation".
-  //    Bare "root" then matches "root extract" in unrelated essential-oil papers.
-  //    Use "rooting" (verb/gerund) and "adventitious" — specific to propagation biology.
-  '扦插': 'cuttings cutting propagation rooting adventitious',
-  '扦插繁殖': 'cutting propagation vegetative propagation rooting adventitious',
-  '插穗': 'cuttings stem cuttings rooting',
+  // 🔴 NO bare "root" and NO hyphenated compounds — extractQueryKeywords()
+  //    strips hyphens, turning "root-formation" → "root" → matches "root extract".
+  // 🔴 Word ORDER matters: first 3 words go to CrossRef query → must cover
+  //    BOTH "cuttings" and "rooting" synonym families (different papers use different words).
+  //    Remaining words are for scoreQuery only (rich matching, no recall impact).
+  '扦插': 'cuttings rooting propagation adventitious cutting',
+  '扦插繁殖': 'cuttings rooting vegetative propagation adventitious',
+  '插穗': 'cuttings rooting stem',
   '發根': 'rooting adventitious cuttings',
   '不定根': 'adventitious rooting',
   '生根': 'rooting cuttings propagation',
@@ -893,11 +887,31 @@ async function enrichQueryWithTranslation(query) {
     }
   }
 
+  // CrossRef dual-query: TWO calls, each ≤5 words, together cover ALL synonyms
+  // Problem: one query can't fit both "cuttings" AND "rooting" without recall explosion.
+  // Solution: split technique words into two queries → each stays focused → merge results.
+  // This is word-order-INVARIANT — works for any glossary regardless of which synonym is first.
+  var crossrefWords = englishParts.slice();
+  var crossrefWords2 = englishParts.slice();  // Second query for remaining synonyms
+  if (chineseText) {
+    var glossaryTerms = applyGlossary(chineseText);
+    if (glossaryTerms.length > 0) {
+      var allTechWords = glossaryTerms[0].toLowerCase().split(/\s+/);
+      // Query A: first 3 technique words (primary synonyms)
+      crossrefWords = crossrefWords.concat(allTechWords.slice(0, 3));
+      // Query B: remaining technique words (secondary synonyms)
+      if (allTechWords.length > 3) {
+        crossrefWords2 = crossrefWords2.concat(allTechWords.slice(3, 6));
+      }
+    }
+  }
+
   return {
-    openalex: dedupWords(openalexWords).join(' ') || query,     // SIMPLE: plant names only → OpenAlex
-    crossref: dedupWords(scoreWords).join(' ') || query,        // RICH: AI keywords → CrossRef bibliographic
-    score: dedupWords(scoreWords).join(' ') || query,           // RICH: for relevance scoring
-    scientificName: scientificName || null,                      // {genus, species, source} or null
+    openalex: dedupWords(openalexWords).join(' ') || query,         // SIMPLE: plant names only → OpenAlex
+    crossref: dedupWords(crossrefWords).join(' ') || query,         // CrossRef-A: plant + primary synonyms (≤5 words)
+    crossref2: dedupWords(crossrefWords2).join(' ') || null,        // CrossRef-B: plant + secondary synonyms (or null if none)
+    score: dedupWords(scoreWords).join(' ') || query,               // RICH: full glossary → relevance scoring only
+    scientificName: scientificName || null,                          // {genus, species, source} or null
     scientificNameSource: sciNameExplicitNone ? 'ai-none' : (scientificName ? scientificName.source : 'none'),
     scientificNameExplicitNone: sciNameExplicitNone
   };
@@ -1055,7 +1069,7 @@ async function searchCrossRef(query, limit) {
     var q = truncateQuery(eq, 300);
     var url = CROSSREF_API + '?query.bibliographic=' + encodeURIComponent(q) +
               '&rows=' + limit + '&sort=score' +
-              '&filter=type:journal-article,has-abstract:true,from-pub-date:2010';
+              '&filter=type:journal-article,from-pub-date:2010';
     var resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!resp.ok) return allResults;
     var data = await resp.json();
@@ -2630,12 +2644,41 @@ async function runFullSearchPipeline(query, callbacks) {
     // not the result direction. Our NLP classifier handles negative detection.
     var s2Query = stripNegativeIntentWords(crossrefQuery);
 
+    // CrossRef dual-query: two calls cover all glossary synonyms without recall explosion.
+    // crossrefQuery = primary synonyms (first 3), crossrefQuery2 = secondary synonyms (rest).
+    var crossrefQuery2 = (enriched && enriched.crossref2) ? enriched.crossref2 : null;
+
     var searchLimit = getSearchLimit();
-    var [oaResults, s2Results, crResults] = await Promise.allSettled([
+    var crHalfLimit = Math.ceil(searchLimit / 2);  // Each CrossRef call gets half the budget
+    var crPromises = [searchCrossRef(crossrefQuery, crHalfLimit)];
+    if (crossrefQuery2) {
+      crPromises.push(searchCrossRef(crossrefQuery2, crHalfLimit));
+    }
+    var [oaResults, s2Results, crResultsRaw] = await Promise.allSettled([
       searchOpenAlex(openalexQuery, searchLimit),
       searchSemanticScholar(s2Query, searchLimit),
-      searchCrossRef(crossrefQuery, searchLimit),
+      Promise.all(crPromises).then(function(results) {
+        // Merge both CrossRef calls, dedup by DOI
+        var merged = [];
+        var seenDOIs = {};
+        for (var ri = 0; ri < results.length; ri++) {
+          if (!results[ri]) continue;
+          for (var rj = 0; rj < results[ri].length; rj++) {
+            var paper = results[ri][rj];
+            if (paper.doi && seenDOIs[paper.doi]) continue;
+            if (paper.doi) seenDOIs[paper.doi] = true;
+            merged.push(paper);
+          }
+        }
+        // Attach debug from first call
+        if (results[0] && results[0]._debug) merged._debug = results[0]._debug;
+        return merged;
+      }),
     ]);
+    // Wrap merged CrossRef result in the {status, value} format expected by the loop below
+    var crResults = crResultsRaw.status === 'fulfilled'
+      ? {status: 'fulfilled', value: crResultsRaw.value}
+      : {status: 'rejected', reason: crResultsRaw.reason || 'CrossRef dual-query failed'};
 
     var allRaw = [];
     var sourcesWithResults = 0;
@@ -2820,7 +2863,8 @@ async function runFullSearchPipeline(query, callbacks) {
     return {
       query: query,
       openalexQuery: openalexQuery,  // SIMPLE core → OpenAlex
-      crossrefQuery: crossrefQuery,  // RICH AI → CrossRef + Semantic Scholar
+      crossrefQuery: crossrefQuery,    // CrossRef-A: primary synonyms
+      crossrefQuery2: crossrefQuery2,  // CrossRef-B: secondary synonyms (or null)
       scoreQuery: scoreQuery,    // AI-enriched (used for relevance scoring)
       papers: verifyResult.papers,
       regular: regularPapers,
@@ -3018,6 +3062,7 @@ function renderReport(result) {
     var sq = result.scoreQuery ? ' 📊評分關鍵字:' + esc(result.scoreQuery) : '';
     var openalexNote = (result.openalexQuery && result.openalexQuery !== result.query ? ' 🔎OA搜尋:' + esc(result.openalexQuery) : '');
     var crossrefNote = (result.crossrefQuery && result.crossrefQuery !== result.query ? ' CR搜尋:' + esc(result.crossrefQuery) : '');
+    if (result.crossrefQuery2) crossrefNote += ' CR2:' + esc(result.crossrefQuery2);
     var searchQueryNote = openalexNote + crossrefNote + sq;
     parts.push('<div style="font-size:0.85rem;color:var(--muted);margin-bottom:16px;">' +
       modeLabel + ' · ' + esc(srcParts.join('，')) +
